@@ -88,9 +88,7 @@ class BootstrapTest(unittest.TestCase):
             home.mkdir()
 
             relative = bootstrap.copy_operation(source_repo, destination, ".pi")
-            absolute = bootstrap.copy_operation(
-                source_repo, destination, str(absolute_source)
-            )
+            absolute = bootstrap.copy_operation(source_repo, destination, str(absolute_source))
             with mock.patch.dict(os.environ, {"HOME": str(home)}):
                 home_relative = bootstrap.copy_operation(
                     source_repo, destination, "~/private/project.env"
@@ -117,18 +115,14 @@ class BootstrapTest(unittest.TestCase):
             rule = bootstrap.WorktreeRule(source_repo, (".pi",), False, False, ())
             messages: list[str] = []
 
-            succeeded = bootstrap.run_bootstrap(
-                (rule,), source_repo, destination, messages.append
-            )
+            succeeded = bootstrap.run_bootstrap((rule,), source_repo, destination, messages.append)
 
             self.assertTrue(succeeded)
             self.assertEqual(
                 (destination / ".pi" / "settings.toml").read_text(), "enabled = true\n"
             )
             self.assertTrue((destination / ".pi" / "settings-link").is_symlink())
-            self.assertEqual(
-                os.readlink(destination / ".pi" / "settings-link"), "settings.toml"
-            )
+            self.assertEqual(os.readlink(destination / ".pi" / "settings-link"), "settings.toml")
 
     def test_git_hooks_use_the_new_worktree_git_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -156,24 +150,18 @@ class BootstrapTest(unittest.TestCase):
             rule = bootstrap.WorktreeRule(source_repo, (), True, False, ())
             messages: list[str] = []
 
-            succeeded = bootstrap.run_bootstrap(
-                (rule,), source_repo, destination, messages.append
-            )
+            succeeded = bootstrap.run_bootstrap((rule,), source_repo, destination, messages.append)
 
             git_dir = Path(git("rev-parse", "--git-dir", cwd=destination))
             if not git_dir.is_absolute():
                 git_dir = destination / git_dir
             self.assertTrue(succeeded)
-            self.assertEqual(
-                git("config", "--get", "extensions.worktreeConfig"), "true"
-            )
+            self.assertEqual(git("config", "--get", "extensions.worktreeConfig"), "true")
             self.assertEqual(
                 git("config", "--worktree", "--get", "core.hooksPath", cwd=destination),
                 str(git_dir.resolve() / "hooks"),
             )
-            self.assertTrue(
-                any("resolved Git directory" in message for message in messages)
-            )
+            self.assertTrue(any("resolved Git directory" in message for message in messages))
 
     def test_git_submodules_initialize_before_custom_commands(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
@@ -249,10 +237,7 @@ class BootstrapTest(unittest.TestCase):
             )
             self.assertEqual((destination / "submodule-command-ran").read_text(), "yes")
             self.assertTrue(
-                any(
-                    "git submodule update --init --recursive" in message
-                    for message in messages
-                )
+                any("git submodule update --init --recursive" in message for message in messages)
             )
 
     def test_all_copy_paths_finish_before_any_command(self) -> None:
@@ -277,15 +262,11 @@ class BootstrapTest(unittest.TestCase):
                         ),
                     ),
                 ),
-                bootstrap.WorktreeRule(
-                    source_repo, ("copied-before-commands",), False, False, ()
-                ),
+                bootstrap.WorktreeRule(source_repo, ("copied-before-commands",), False, False, ()),
             )
             messages: list[str] = []
 
-            succeeded = bootstrap.run_bootstrap(
-                rules, source_repo, destination, messages.append
-            )
+            succeeded = bootstrap.run_bootstrap(rules, source_repo, destination, messages.append)
 
             self.assertTrue(succeeded)
             self.assertTrue((destination / "copied-before-commands").is_file())
@@ -316,19 +297,13 @@ class BootstrapTest(unittest.TestCase):
             )
             messages: list[str] = []
 
-            succeeded = bootstrap.run_bootstrap(
-                (rule,), source_repo, destination, messages.append
-            )
+            succeeded = bootstrap.run_bootstrap((rule,), source_repo, destination, messages.append)
 
             self.assertFalse(succeeded)
             self.assertEqual((destination / ".env").read_text(), "existing\n")
             self.assertEqual((destination / "later-command-ran").read_text(), "ok")
-            self.assertTrue(
-                any("destination already exists" in message for message in messages)
-            )
-            self.assertTrue(
-                any("skipped missing source" in message for message in messages)
-            )
+            self.assertTrue(any("destination already exists" in message for message in messages))
+            self.assertTrue(any("skipped missing source" in message for message in messages))
             self.assertTrue(any("exit status 7" in message for message in messages))
 
     def test_main_returns_failure_after_a_failed_step_but_runs_later_commands(
@@ -359,9 +334,7 @@ class BootstrapTest(unittest.TestCase):
             )
             environment = {
                 "HERDR_PLUGIN_CONFIG_DIR": str(config_dir),
-                "HERDR_PLUGIN_EVENT_JSON": json.dumps(
-                    self.event(source_repo, destination)
-                ),
+                "HERDR_PLUGIN_EVENT_JSON": json.dumps(self.event(source_repo, destination)),
             }
 
             exit_code = bootstrap.main(environment)

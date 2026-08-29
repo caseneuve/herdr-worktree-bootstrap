@@ -77,9 +77,7 @@ def parse_git_submodules(value: object, rule_number: int) -> bool:
     if value is None:
         return False
     if not isinstance(value, bool):
-        raise BootstrapError(
-            f"worktree rule {rule_number}.git-submodules must be a boolean"
-        )
+        raise BootstrapError(f"worktree rule {rule_number}.git-submodules must be a boolean")
     return value
 
 
@@ -129,9 +127,7 @@ def load_rules(config_path: Path) -> tuple[WorktreeRule, ...]:
                 repo=canonical_path(Path(repo)),
                 paths=parse_paths(raw_rule.get("paths"), index),
                 git_hooks=parse_git_hooks(raw_rule.get("git-hooks"), index),
-                git_submodules=parse_git_submodules(
-                    raw_rule.get("git-submodules"), index
-                ),
+                git_submodules=parse_git_submodules(raw_rule.get("git-submodules"), index),
                 commands=parse_commands(raw_rule.get("commands"), index),
             )
         )
@@ -165,9 +161,7 @@ def worktree_paths_from_event(event: object) -> tuple[Path, Path]:
     return canonical_path(Path(source_repo)), canonical_path(Path(destination))
 
 
-def matching_rules(
-    rules: Sequence[WorktreeRule], source_repo: Path
-) -> tuple[WorktreeRule, ...]:
+def matching_rules(rules: Sequence[WorktreeRule], source_repo: Path) -> tuple[WorktreeRule, ...]:
     source_repo = canonical_path(source_repo)
     return tuple(rule for rule in rules if rule.repo == source_repo)
 
@@ -225,14 +219,10 @@ def copy_path(operation: CopyOperation, log: Callable[[str], None]) -> bool:
         destination_parent.relative_to(operation.destination_root)
         destination_parent.mkdir(parents=True, exist_ok=True)
         if source.is_symlink():
-            destination.symlink_to(
-                os.readlink(source), target_is_directory=source.is_dir()
-            )
+            destination.symlink_to(os.readlink(source), target_is_directory=source.is_dir())
             shutil.copystat(source, destination, follow_symlinks=False)
         elif source.is_dir():
-            shutil.copytree(
-                source, destination, symlinks=True, copy_function=shutil.copy2
-            )
+            shutil.copytree(source, destination, symlinks=True, copy_function=shutil.copy2)
         elif source.is_file():
             shutil.copy2(source, destination, follow_symlinks=False)
         else:
@@ -305,9 +295,7 @@ def configure_git_hooks(destination_root: Path, log: Callable[[str], None]) -> b
     return not failed
 
 
-def configure_git_submodules(
-    destination_root: Path, log: Callable[[str], None]
-) -> bool:
+def configure_git_submodules(destination_root: Path, log: Callable[[str], None]) -> bool:
     """Initialize nested submodules at the commits pinned by the superproject."""
     return run_command(
         ("git", "submodule", "update", "--init", "--recursive"),
@@ -326,9 +314,7 @@ def run_command(
         log(f"failed to start {shlex.join(command)}: {error}")
         return False
     if completed.returncode != 0:
-        log(
-            f"command failed with exit status {completed.returncode}: {shlex.join(command)}"
-        )
+        log(f"command failed with exit status {completed.returncode}: {shlex.join(command)}")
         return False
     log(f"command succeeded: {shlex.join(command)}")
     return True
@@ -345,9 +331,7 @@ def run_bootstrap(
     for rule in rules:
         for configured_path in rule.paths:
             try:
-                operation = copy_operation(
-                    source_repo, destination_root, configured_path
-                )
+                operation = copy_operation(source_repo, destination_root, configured_path)
             except BootstrapError as error:
                 log(f"failed copy configuration {configured_path!r}: {error}")
                 failed = True
@@ -374,9 +358,7 @@ def log(message: str) -> None:
 def main(environment: Mapping[str, str] = os.environ) -> int:
     config_dir = environment.get("HERDR_PLUGIN_CONFIG_DIR")
     if not config_dir:
-        print(
-            "[worktree-bootstrap] HERDR_PLUGIN_CONFIG_DIR is not set", file=sys.stderr
-        )
+        print("[worktree-bootstrap] HERDR_PLUGIN_CONFIG_DIR is not set", file=sys.stderr)
         return 2
 
     config_path = Path(config_dir) / CONFIG_FILENAME
@@ -386,9 +368,7 @@ def main(environment: Mapping[str, str] = os.environ) -> int:
 
     event_json = environment.get("HERDR_PLUGIN_EVENT_JSON")
     if not event_json:
-        print(
-            "[worktree-bootstrap] HERDR_PLUGIN_EVENT_JSON is not set", file=sys.stderr
-        )
+        print("[worktree-bootstrap] HERDR_PLUGIN_EVENT_JSON is not set", file=sys.stderr)
         return 2
 
     try:

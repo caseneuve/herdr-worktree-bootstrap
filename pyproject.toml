@@ -1,0 +1,16 @@
+[project]
+name = "herdr-worktree-bootstrap"
+version = "2026.08.29"
+description = "Herdr plugin for seeding newly created Git worktrees"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.ruff]
+line-length = 99
+target-version = "py311"
+
+[dependency-groups]
+dev = [
+    "ruff==0.12.11",
+]

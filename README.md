@@ -151,18 +151,33 @@ herdr plugin log list --plugin caseneuve.herdr-worktree-bootstrap
 The log includes the copied/skipped paths, each argv command, and command
 stdout or stderr captured by Herdr.
 
-## Test
+## Development and test
 
-Run the focused test suite from the repository root:
+The plugin has no runtime Python dependencies. Development tools are locked in
+`uv.lock`. With `uv` and `prek` available on `PATH`, create the environment
+and install the Prek hook shims once per checkout:
 
 ```bash
-just test
+uv sync --group dev
+prek install
 ```
 
-Or run it directly:
+Prek runs `ruff format` and `ruff check` on changed Python files. Ruff is
+configured for a 99-column line length; a formatter change must be staged
+before committing.
+
+Run the full local suite from the repository root:
 
 ```bash
-python3 -m unittest discover -s tests -v
+just check
+```
+
+Individual commands are also available:
+
+```bash
+just format        # apply Ruff formatting
+just lint          # run Ruff checks
+just test          # run the focused unit suite
 ```
 
 ## Development: live Herdr test

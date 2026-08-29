@@ -6,14 +6,22 @@ This repository is a standalone Herdr plugin. Keep user configuration outside
 of the repository; Herdr supplies its location through
 `HERDR_PLUGIN_CONFIG_DIR`.
 
-## Validation
+## Development and validation
 
-Run the focused suite before committing:
+Use the locked UV development environment, then install the repository hooks:
 
 ```bash
-just test
+uv sync --group dev
+prek install
 ```
 
+Run every check before committing:
+
+```bash
+just check
+```
+
+Ruff formats Python at 99 columns and checks it through Prek pre-commit hooks.
 See `README.md` for production installation and the isolated live-development
 test route. Do not replace a GitHub-installed release with a local link under
 the production plugin ID.
