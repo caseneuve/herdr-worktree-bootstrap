@@ -1,5 +1,17 @@
+e2e-image := "herdr-worktree-bootstrap-e2e"
+
 test:
     uv run --group dev python -m unittest discover -s tests -v
+
+test-e2e:
+    podman build --tag {{e2e-image}} --file test/e2e/Containerfile .
+    podman run --rm --network none \
+        --mount type=bind,src="$(pwd)",dst=/work,ro \
+        --mount type=bind,src="$(command -v herdr)",dst=/usr/local/bin/herdr,ro \
+        --env HOME=/tmp/home \
+        --env XDG_CONFIG_HOME=/tmp/config \
+        --env XDG_STATE_HOME=/tmp/state \
+        {{e2e-image}}
 
 format:
     uv run --group dev ruff format .

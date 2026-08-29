@@ -180,115 +180,16 @@ just lint          # run Ruff checks
 just test          # run the focused unit suite
 ```
 
-## Development: live Herdr test
+## Containerized E2E
 
-Unit tests do not start Herdr. Use this route when an agent needs to validate
-that a local change runs from a real `worktree.created` event.
+Run the live Herdr integration test with:
 
-This flow must run inside a disposable Herdr session (`HERDR_ENV=1`). It opens
-a temporary workspace in that session. Do not target a real repository.
+```bash
+just test-e2e
+```
 
-Herdr keeps one global registration per plugin ID. Linking a local checkout
-with the released ID would replace the GitHub-installed release, so this route
-uses a temporary development ID and separate managed configuration.
-
-1. Create a temporary plugin worktree and give only that checkout a development
-   identity:
-
-   ```bash
-   plugin_repo="$(git rev-parse --show-toplevel)"
-   dev_root="$(mktemp -d)"
-   rmdir "$dev_root"
-   git -C "$plugin_repo" worktree add --detach "$dev_root" HEAD
-
-   dev_id="caseneuve.herdr-worktree-bootstrap.dev-$$"
-   python3 - "$dev_root/herdr-plugin.toml" "$dev_id" <<'PY'
-   from pathlib import Path
-   import re
-   import sys
-
-   manifest = Path(sys.argv[1])
-   plugin_id = sys.argv[2]
-   manifest.write_text(
-       re.sub(r'^id = ".*"$', f'id = "{plugin_id}"', manifest.read_text(), flags=re.MULTILINE)
-   )
-   PY
-   herdr plugin link "$dev_root"
-   ```
-
-2. Create an isolated Git fixture, an ignored file to seed, and development
-   configuration that matches only that fixture:
-
-   ```bash
-   fixture_root="$(mktemp -d)"
-   git -C "$fixture_root" init -q
-   git -C "$fixture_root" config user.email test@example.invalid
-   git -C "$fixture_root" config user.name "Worktree Bootstrap Test"
-   printf 'fixture\n' > "$fixture_root/README.md"
-   printf '.worktree-bootstrap-private\n' > "$fixture_root/.gitignore"
-   git -C "$fixture_root" add README.md .gitignore
-   git -C "$fixture_root" commit -qm fixture
-   printf 'seed me\n' > "$fixture_root/.worktree-bootstrap-private"
-
-   config_dir="$(herdr plugin config-dir "$dev_id")"
-   mkdir -p "$config_dir"
-   cat > "$config_dir/config.toml" <<EOF
-   [[worktree]]
-   repo = "$fixture_root"
-   paths = [".worktree-bootstrap-private"]
-   commands = [
-     ["python3", "-c", "from pathlib import Path; Path('.worktree-bootstrap-command-ran').touch()"],
-   ]
-   EOF
-   ```
-
-3. Create the fixture worktree through Herdr, then verify the hook result and
-   its log. The hook is asynchronous, so wait until the two files exist before
-   asserting success.
-
-   ```bash
-   fixture_worktree="$(mktemp -d)"
-   rmdir "$fixture_worktree"
-   worktree_result="$(herdr worktree create \
-     --cwd "$fixture_root" \
-     --branch herdr-bootstrap-dev \
-     --path "$fixture_worktree" \
-     --no-focus \
-     --trust-repository)"
-   workspace_id="$(python3 -c 'import json, sys; print(json.load(sys.stdin)["result"]["workspace"]["workspace_id"])' <<<"$worktree_result")"
-
-   python3 - "$fixture_worktree" <<'PY'
-   from pathlib import Path
-   import sys
-   import time
-
-   worktree = Path(sys.argv[1])
-   expected = [
-       worktree / ".worktree-bootstrap-private",
-       worktree / ".worktree-bootstrap-command-ran",
-   ]
-   deadline = time.monotonic() + 10
-   while time.monotonic() < deadline:
-       if all(path.is_file() for path in expected):
-           break
-       time.sleep(0.1)
-   else:
-       raise SystemExit(f"timed out waiting for {expected}")
-   PY
-   herdr plugin log list --plugin "$dev_id"
-   ```
-
-4. Close the disposable Herdr workspace, then unregister and remove all
-   temporary resources. Keep the GitHub-installed release registered.
-
-   ```bash
-   herdr workspace close "$workspace_id"
-   herdr plugin unlink "$dev_id"
-   rm -rf "$(herdr plugin config-dir "$dev_id")"
-   git -C "$plugin_repo" worktree remove --force "$dev_root"
-   git -C "$fixture_root" worktree remove --force "$fixture_worktree"
-   rm -rf "$fixture_root"
-   ```
-
-The development manifest change is confined to the temporary Git worktree; do
-not commit it.
+It requires Podman and a local `herdr` binary. The recipe mounts this checkout
+read-only, runs a headless Herdr server, links a temporary plugin copy, and
+creates its fixture repositories and configuration entirely inside a
+short-lived container. The GitHub-installed plugin and host checkout are not
+modified; Podman retains its cached test image.

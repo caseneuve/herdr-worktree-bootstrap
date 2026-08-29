@@ -22,9 +22,9 @@ just check
 ```
 
 Ruff formats Python at 99 columns and checks it through Prek pre-commit hooks.
-See `README.md` for production installation and the isolated live-development
-test route. Do not replace a GitHub-installed release with a local link under
-the production plugin ID.
+Run `just test-e2e` to exercise a real `worktree.created` event. It requires
+Podman and a local `herdr` binary; all fixture setup and cleanup stays inside
+the short-lived container. See `README.md` for production installation.
 
 ## Releases
 

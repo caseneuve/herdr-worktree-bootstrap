@@ -1,0 +1,6 @@
+.git
+.venv
+.reviews
+.ruff_cache
+__pycache__
+tests/__pycache__
