@@ -22,9 +22,10 @@ just check
 ```
 
 Ruff formats Python at 99 columns and checks it through Prek pre-commit hooks.
-Run `just test-e2e` to exercise a real `worktree.created` event. It requires
-Podman and a local `herdr` binary; all fixture setup and cleanup stays inside
-the short-lived container. See `README.md` for production installation.
+Run `just build-e2e` once (or after changing its Containerfile), then `just
+test-e2e` to exercise a real `worktree.created` event. It requires Podman and a
+local `herdr` binary; all fixture setup and cleanup stays inside the
+short-lived container. See `README.md` for production installation.
 
 ## Releases
 

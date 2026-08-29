@@ -182,13 +182,14 @@ just test          # run the focused unit suite
 
 ## Containerized E2E
 
-Run the live Herdr integration test with:
+Build the E2E image once, and again whenever `test/e2e/Containerfile` changes:
 
 ```bash
+just build-e2e
 just test-e2e
 ```
 
-It requires Podman and a local `herdr` binary. The recipe mounts this checkout
+It requires Podman and a local `herdr` binary. The test recipe mounts this checkout
 read-only, runs a headless Herdr server, links a temporary plugin copy, and
 creates its fixture repositories and configuration entirely inside a
 short-lived container. The GitHub-installed plugin and host checkout are not
