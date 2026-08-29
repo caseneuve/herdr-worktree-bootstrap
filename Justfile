@@ -14,6 +14,7 @@ test-e2e:
         --env HOME=/tmp/home \
         --env XDG_CONFIG_HOME=/tmp/config \
         --env XDG_STATE_HOME=/tmp/state \
+        --env E2E_DEBUG \
         {{e2e-image}}
 
 format:

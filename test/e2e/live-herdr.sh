@@ -8,6 +8,11 @@ readonly WAIT_SECONDS=10
 
 server_pid=""
 
+debug() {
+    [[ "${E2E_DEBUG:-}" == "1" ]] || return 0
+    printf 'live Herdr E2E [debug]: %s\n' "$*" >&2
+}
+
 fail() {
     printf 'live Herdr E2E: %s\n' "$*" >&2
     exit 1
@@ -59,6 +64,11 @@ assert any(
     for log in logs
 )
 '; then
+                debug "seeded file content: $(cat /tmp/fixture-worktree/.worktree-bootstrap-private)"
+                debug "command marker exists: /tmp/fixture-worktree/.worktree-bootstrap-command-ran"
+                if [[ "${E2E_DEBUG:-}" == "1" ]]; then
+                    printf 'live Herdr E2E [debug]: plugin log: %s\n' "$logs" >&2
+                fi
                 return 0
             fi
         fi
@@ -73,6 +83,8 @@ done
 
 trap cleanup EXIT
 
+debug "using $(herdr --version) with isolated HOME and XDG directories"
+
 # Copy the current checkout, including uncommitted source changes, into the
 # container's temporary filesystem. The host checkout stays read-only.
 mkdir -p /tmp/plugin
@@ -86,6 +98,7 @@ tar \
     -C /work \
     -cf - . \
     | tar -C /tmp/plugin -xf -
+debug "copied the read-only checkout to /tmp/plugin"
 python3 - /tmp/plugin/herdr-plugin.toml "$PLUGIN_ID" <<'PY'
 from pathlib import Path
 import re
@@ -101,8 +114,10 @@ PY
 herdr server >/tmp/herdr-server.log 2>&1 &
 server_pid=$!
 wait_for_server
+debug "headless server ready: $(cat /tmp/server-status.json)"
 
 herdr plugin link /tmp/plugin >/tmp/plugin-link.json
+debug "temporary plugin link: $(cat /tmp/plugin-link.json)"
 config_dir="$(herdr plugin config-dir "$PLUGIN_ID")"
 mkdir -p "$config_dir"
 
@@ -131,6 +146,7 @@ herdr worktree create \
     --path /tmp/fixture-worktree \
     --no-focus \
     >/tmp/worktree-create.json
+debug "worktree create result: $(cat /tmp/worktree-create.json)"
 
 wait_for_bootstrap
 printf 'live Herdr E2E: passed\n'

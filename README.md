@@ -193,4 +193,5 @@ It requires Podman and a local `herdr` binary. The test recipe mounts this check
 read-only, runs a headless Herdr server, links a temporary plugin copy, and
 creates its fixture repositories and configuration entirely inside a
 short-lived container. The GitHub-installed plugin and host checkout are not
-modified; Podman retains its cached test image.
+modified; Podman retains its cached test image. Add `E2E_DEBUG=1` to print
+fixture, worktree, and successful plugin-log evidence.
