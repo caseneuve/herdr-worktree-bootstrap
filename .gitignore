@@ -1,0 +1,6 @@
+*.py[cod]
+.coverage
+.pi
+.reviews/
+.venv/
+__pycache__/

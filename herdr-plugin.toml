@@ -1,0 +1,10 @@
+id = "caseneuve.herdr-worktree-bootstrap"
+name = "Worktree Bootstrap"
+version = "2026.08.29"
+min_herdr_version = "0.7.0"
+description = "Copy local files and run bootstrap commands after Herdr creates a worktree."
+platforms = ["linux", "macos"]
+
+[[events]]
+on = "worktree.created"
+command = ["python3", "bootstrap.py"]
