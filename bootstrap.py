@@ -351,6 +351,70 @@ def run_bootstrap(
     return not failed
 
 
+def notification_delivery(response_json: str) -> tuple[bool, str] | None:
+    """Extract whether Herdr showed a notification and its reported reason."""
+    try:
+        response = json.loads(response_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(response, dict):
+        return None
+    result = response.get("result")
+    if not isinstance(result, dict) or result.get("type") != "notification_show":
+        return None
+    shown = result.get("shown")
+    reason = result.get("reason")
+    if not isinstance(shown, bool) or not isinstance(reason, str):
+        return None
+    return shown, reason
+
+
+def notify_bootstrap_completion(
+    destination_root: Path,
+    succeeded: bool,
+    herdr_binary: str,
+    log: Callable[[str], None],
+) -> None:
+    """Notify the Herdr session without changing the bootstrap outcome."""
+    title = "Worktree ready" if succeeded else "Worktree setup failed"
+    body = str(destination_root) if succeeded else f"Check the plugin log for {destination_root}"
+    sound = "done" if succeeded else "request"
+    command = (
+        herdr_binary,
+        "notification",
+        "show",
+        title,
+        "--body",
+        body,
+        "--sound",
+        sound,
+    )
+    log(f"sending completion notification: {shlex.join(command)}")
+    try:
+        completed = subprocess.run(command, check=False, capture_output=True, text=True)
+    except OSError as error:
+        log(f"failed to send completion notification: {error}")
+        return
+    if completed.returncode != 0:
+        detail = completed.stderr.strip()
+        suffix = f": {detail}" if detail else ""
+        log(
+            f"failed to send completion notification with exit status {completed.returncode}{suffix}"
+        )
+        return
+
+    response = notification_delivery(completed.stdout)
+    if response is None:
+        log(f"failed to parse completion notification response: {completed.stdout.strip()!r}")
+        return
+    shown, reason = response
+    log(f"completion notification response: {completed.stdout.strip()}")
+    if shown:
+        log(f"completion notification shown: {reason}")
+    else:
+        log(f"completion notification was not shown: {reason}")
+
+
 def log(message: str) -> None:
     print(f"[worktree-bootstrap] {message}", flush=True)
 
@@ -384,7 +448,14 @@ def main(environment: Mapping[str, str] = os.environ) -> int:
         return 0
 
     log(f"bootstrapping {destination_root} from {source_repo}")
-    return 0 if run_bootstrap(rules, source_repo, destination_root, log) else 1
+    succeeded = run_bootstrap(rules, source_repo, destination_root, log)
+    notify_bootstrap_completion(
+        destination_root,
+        succeeded,
+        environment.get("HERDR_BIN_PATH") or "herdr",
+        log,
+    )
+    return 0 if succeeded else 1
 
 
 if __name__ == "__main__":

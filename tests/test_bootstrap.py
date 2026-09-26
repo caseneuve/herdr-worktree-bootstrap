@@ -15,6 +15,19 @@ sys.path.insert(0, str(PLUGIN_ROOT))
 import bootstrap  # noqa: E402
 
 
+def notification_response(shown: bool, reason: str) -> str:
+    return json.dumps(
+        {
+            "id": "cli:notification:show",
+            "result": {
+                "type": "notification_show",
+                "shown": shown,
+                "reason": reason,
+            },
+        }
+    )
+
+
 class BootstrapTest(unittest.TestCase):
     def event(self, source_repo: Path, destination: Path) -> dict[str, object]:
         return {
@@ -240,6 +253,128 @@ class BootstrapTest(unittest.TestCase):
                 any("git submodule update --init --recursive" in message for message in messages)
             )
 
+    def test_completion_notification_reports_a_ready_worktree(self) -> None:
+        destination = Path("/tmp/new-worktree")
+        messages: list[str] = []
+
+        with mock.patch.object(
+            bootstrap.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess(
+                (), 0, notification_response(True, "shown"), ""
+            ),
+        ) as run:
+            bootstrap.notify_bootstrap_completion(
+                destination, True, "/usr/bin/herdr", messages.append
+            )
+
+        run.assert_called_once_with(
+            (
+                "/usr/bin/herdr",
+                "notification",
+                "show",
+                "Worktree ready",
+                "--body",
+                str(destination),
+                "--sound",
+                "done",
+            ),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("completion notification shown: shown", messages)
+
+    def test_completion_notification_reports_bootstrap_failures(self) -> None:
+        destination = Path("/tmp/new-worktree")
+        messages: list[str] = []
+
+        with mock.patch.object(
+            bootstrap.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess(
+                (), 0, notification_response(True, "shown"), ""
+            ),
+        ) as run:
+            bootstrap.notify_bootstrap_completion(destination, False, "herdr", messages.append)
+
+        run.assert_called_once_with(
+            (
+                "herdr",
+                "notification",
+                "show",
+                "Worktree setup failed",
+                "--body",
+                f"Check the plugin log for {destination}",
+                "--sound",
+                "request",
+            ),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertIn("completion notification shown: shown", messages)
+
+    def test_completion_notification_logs_when_herdr_does_not_show_it(self) -> None:
+        messages: list[str] = []
+
+        with mock.patch.object(
+            bootstrap.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess(
+                (), 0, notification_response(False, "disabled"), ""
+            ),
+        ):
+            bootstrap.notify_bootstrap_completion(
+                Path("/tmp/new-worktree"), True, "herdr", messages.append
+            )
+
+        self.assertIn("completion notification was not shown: disabled", messages)
+        self.assertNotIn("completion notification shown: shown", messages)
+
+    def test_completion_notification_logs_invalid_response(self) -> None:
+        messages: list[str] = []
+
+        with mock.patch.object(
+            bootstrap.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess((), 0, "not JSON", ""),
+        ):
+            bootstrap.notify_bootstrap_completion(
+                Path("/tmp/new-worktree"), True, "herdr", messages.append
+            )
+
+        self.assertIn("failed to parse completion notification response: 'not JSON'", messages)
+
+    def test_notification_failure_is_logged(self) -> None:
+        messages: list[str] = []
+
+        with mock.patch.object(bootstrap.subprocess, "run", side_effect=OSError("unavailable")):
+            bootstrap.notify_bootstrap_completion(
+                Path("/tmp/new-worktree"), True, "herdr", messages.append
+            )
+
+        self.assertTrue(
+            any("failed to send completion notification" in message for message in messages)
+        )
+
+    def test_notification_nonzero_exit_is_logged(self) -> None:
+        messages: list[str] = []
+
+        with mock.patch.object(
+            bootstrap.subprocess,
+            "run",
+            return_value=subprocess.CompletedProcess((), 1, "", "server unavailable\n"),
+        ):
+            bootstrap.notify_bootstrap_completion(
+                Path("/tmp/new-worktree"), True, "herdr", messages.append
+            )
+
+        self.assertIn(
+            "failed to send completion notification with exit status 1: server unavailable",
+            messages,
+        )
+
     def test_all_copy_paths_finish_before_any_command(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             root = Path(temporary_directory)
@@ -335,12 +470,17 @@ class BootstrapTest(unittest.TestCase):
             environment = {
                 "HERDR_PLUGIN_CONFIG_DIR": str(config_dir),
                 "HERDR_PLUGIN_EVENT_JSON": json.dumps(self.event(source_repo, destination)),
+                "HERDR_BIN_PATH": "/test/herdr",
             }
 
-            exit_code = bootstrap.main(environment)
+            with mock.patch.object(bootstrap, "notify_bootstrap_completion") as notify:
+                exit_code = bootstrap.main(environment)
 
             self.assertEqual(exit_code, 1)
             self.assertEqual((destination / "ran").read_text(), "yes")
+            notify.assert_called_once_with(
+                destination.resolve(), False, "/test/herdr", bootstrap.log
+            )
 
 
 if __name__ == "__main__":

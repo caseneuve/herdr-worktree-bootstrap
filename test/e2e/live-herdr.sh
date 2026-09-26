@@ -49,7 +49,7 @@ sys.exit(not json.loads(Path("/tmp/server-status.json").read_text())["running"])
 
 wait_for_bootstrap() {
     local deadline=$((SECONDS + WAIT_SECONDS))
-    local logs
+    local logs=""
     while ((SECONDS < deadline)); do
         if [[ -f /tmp/fixture-worktree/.worktree-bootstrap-private \
             && -f /tmp/fixture-worktree/.worktree-bootstrap-command-ran ]]; then
@@ -59,10 +59,33 @@ import json
 import sys
 
 logs = json.load(sys.stdin)["result"]["logs"]
-assert any(
-    log.get("event") == "worktree.created" and log.get("status") == "succeeded"
+
+
+def notification_was_suppressed_headlessly(log):
+    prefix = "[worktree-bootstrap] completion notification response: "
+    for line in log.get("stdout", "").splitlines():
+        if not line.startswith(prefix):
+            continue
+        try:
+            result = json.loads(line.removeprefix(prefix))["result"]
+        except (json.JSONDecodeError, KeyError, TypeError):
+            continue
+        if not isinstance(result, dict):
+            continue
+        return (
+            result.get("type") == "notification_show"
+            and result.get("shown") is False
+            and result.get("reason") == "no_foreground_client"
+        )
+    return False
+
+
+sys.exit(not any(
+    log.get("event") == "worktree.created"
+    and log.get("status") == "succeeded"
+    and notification_was_suppressed_headlessly(log)
     for log in logs
-)
+))
 '; then
                 debug "seeded file content: $(cat /tmp/fixture-worktree/.worktree-bootstrap-private)"
                 debug "command marker exists: /tmp/fixture-worktree/.worktree-bootstrap-command-ran"
@@ -74,7 +97,8 @@ assert any(
         fi
         sleep 0.1
     done
-    fail "timed out waiting for the worktree bootstrap hook"
+    printf 'live Herdr E2E: plugin logs at timeout: %s\n' "${logs:-<unavailable>}" >&2
+    fail "timed out waiting for the worktree bootstrap hook (expected no_foreground_client)"
 }
 
 for command in git herdr python3 tar; do
@@ -82,6 +106,14 @@ for command in git herdr python3 tar; do
 done
 
 trap cleanup EXIT
+
+# Exercise the notification API without an attached client: delivery must be
+# reported as no_foreground_client rather than falsely claimed as shown.
+mkdir -p "$XDG_CONFIG_HOME/herdr"
+cat >"$XDG_CONFIG_HOME/herdr/config.toml" <<'EOF'
+[ui.toast]
+delivery = "herdr"
+EOF
 
 debug "using $(herdr --version) with isolated HOME and XDG directories"
 

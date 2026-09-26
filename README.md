@@ -6,11 +6,13 @@ setup commands there.
 
 The hook is deliberately post-create and asynchronous. It does not add options
 to `herdr worktree`, delay the new workspace, undo a failed bootstrap, or alter
-Herdr's normal worktree behavior.
+Herdr's normal worktree behavior. Once every configured step has run, it sends
+a Herdr notification so the new worktree is not mistaken for a ready checkout
+while background setup is still running.
 
 ## Requirements
 
-- Herdr with plugin support (`0.7.0` or later)
+- Herdr with plugin and notification support (`0.7.4` or later)
 - Python `3.11` or later (`tomllib` is used for configuration)
 - Git for optional hook and submodule setup
 
@@ -20,7 +22,7 @@ Install from GitHub with Herdr's native plugin installer. Pin a CalVer release
 tag rather than installing an unreviewed branch head:
 
 ```bash
-herdr plugin install caseneuve/herdr-worktree-bootstrap --ref 2026.08.29
+herdr plugin install caseneuve/herdr-worktree-bootstrap --ref 2026.08.31
 ```
 
 Herdr stores the installed source separately from user configuration. Create
@@ -140,6 +142,18 @@ that cannot start or exits non-zero is logged as a failure. Once every step has
 been attempted, the plugin exits non-zero if any copy or command failed, so
 Herdr marks the event-hook run as failed in its plugin log.
 
+## Completion notification
+
+After all matching copies, optional Git setup, and commands have been attempted,
+the hook requests a Herdr notification. The request uses **Worktree ready**
+with the new worktree path and the configured completion sound, or **Worktree
+setup failed** with Herdr's attention sound when any step failed.
+
+Notifications honor Herdr's configured `[ui.toast]` delivery. Herdr can
+suppress a request when delivery is disabled, rate-limited, busy, or has no
+foreground client; the plugin logs whether it was shown and Herdr's reason. A
+notification failure or suppression does not change the bootstrap result.
+
 ## Logs
 
 Inspect completed hooks with:
@@ -148,8 +162,8 @@ Inspect completed hooks with:
 herdr plugin log list --plugin caseneuve.herdr-worktree-bootstrap
 ```
 
-The log includes the copied/skipped paths, each argv command, and command
-stdout or stderr captured by Herdr.
+The log includes the copied/skipped paths, each argv command, notification
+delivery, and command stdout or stderr captured by Herdr.
 
 ## Development and test
 
